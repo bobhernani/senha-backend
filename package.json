@@ -1,0 +1,24 @@
+{
+  "name": "beckend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "googleapis": "^126.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobhernani/senha-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bobhernani/senha-backend/issues"
+  },
+  "homepage": "https://github.com/bobhernani/senha-backend#readme"
+}
