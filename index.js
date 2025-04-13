@@ -5,13 +5,17 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const credentials = require('./credentials.json'); // Caminho correto para o arquivo
+const { GoogleAuth } = require('google-auth-library');
 
-const auth = new google.auth.JWT({
-  email: credentials.client_email,
-  key: credentials.private_key,
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+const auth = new GoogleAuth({
+  credentials: {
+    client_email: process.env.CLIENT_EMAIL,
+    private_key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
+
+
 
 
 app.use(cors());
