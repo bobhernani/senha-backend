@@ -1,75 +1,98 @@
 const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
-const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
+const { GoogleAuth } = require('google-auth-library');
+
+const auth = new GoogleAuth({
+  credentials: {
+    client_email: process.env.CLIENT_EMAIL,
+    private_key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+
+
+
 app.use(cors());
 app.use(express.json());
 
-const CREDENTIALS = JSON.parse(fs.readFileSync('credentials.json'));
-const SPREADSHEET_ID = '1XhCG-O_ALX9zHrUOW-yIzwQ3qL7TrxKmGAF6vb_IRb8'; // Substitua pelo seu ID
-
-async function getSheetClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: CREDENTIALS,
+// Configuração do Google Auth
+function getAuthClient() {
+  // Corrige a formatação da chave privada (substitui \n por quebras de linha reais)
+  const privateKey = process.env.PRIVATE_KEY.replace(/\\n/g, '\n');
+  
+  return new google.auth.JWT({
+    email: process.env.CLIENT_EMAIL,
+    key: privateKey,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
-
-  const sheets = google.sheets({ version: 'v4', auth });
-  return sheets;
 }
 
+const SPREADSHEET_ID = '1XhCG-O_ALX9zHrUOW-yIzwQ3qL7TrxKmGAF6vb_IRb8';
+
+// Função para gerar hash SHA-256
+function hashSenha(senha) {
+  return crypto.createHash('sha256').update(senha).digest('hex');
+}
+
+// Endpoint para alterar a senha
 app.post('/api/alterar-senha', async (req, res) => {
   const { email, currentPassword, newPassword } = req.body;
 
   try {
-    const sheets = await getSheetClient();
+    const authClient = getAuthClient();
+    await authClient.authorize(); // Autentica explicitamente
+    
+    const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-    // Lê os dados da planilha
+    // Obtém os dados da planilha
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Sheet1!A2:D', // Colunas: Email, Senha, DataCadastro, DataExpiração
+      range: 'Sheet1!A2:D',
     });
 
-    const rows = result.data.values;
-    if (!rows || rows.length === 0) {
-      return res.json({ success: false, message: 'Nenhum usuário encontrado.' });
-    }
-
+    const rows = result.data.values || [];
     const rowIndex = rows.findIndex(row => row[0] === email);
+    
     if (rowIndex === -1) {
-      return res.json({ success: false, message: 'Email não encontrado.' });
+      return res.status(404).json({ success: false, message: 'Email não encontrado.' });
     }
 
-    const userRow = rows[rowIndex];
-    const senhaSalva = userRow[1];
+    const rowToUpdate = rowIndex + 2;
+    const senhaNaPlanilha = rows[rowIndex][1] || '';
+    const hashAtual = hashSenha(currentPassword);
 
-    if (senhaSalva !== currentPassword) {
-      return res.json({ success: false, message: 'Senha atual incorreta.' });
+    if (hashAtual !== senhaNaPlanilha) {
+      return res.status(401).json({ success: false, message: 'Senha atual incorreta.' });
     }
 
     // Atualiza a senha
-    
-    const rowToUpdate = rowIndex + 2; // +2 por causa do cabeçalho e índice base 1
+    const novaSenhaHash = hashSenha(newPassword);
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `Sheet1!B${rowToUpdate}`, // Coluna B: Senha
+      range: `Sheet1!B${rowToUpdate}`,
       valueInputOption: 'RAW',
-      requestBody: {
-        values: [[newPassword]],
+      resource: {
+        values: [[novaSenhaHash]],
       },
     });
 
-    return res.json({ success: true, message: 'Senha atualizada com sucesso!' });
-
+    res.json({ success: true, message: 'Senha atualizada com sucesso!' });
   } catch (err) {
-    console.error('Erro:', err);
-    return res.status(500).json({ success: false, message: 'Erro ao alterar a senha.' });
+    console.error('Erro detalhado:', err.message, err.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao alterar a senha.',
+      error: err.message 
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
