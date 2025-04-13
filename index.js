@@ -4,7 +4,7 @@ const { google } = require('googleapis');
 const crypto = require('crypto');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 const credentials = require('./credentials.json'); // Caminho correto para o arquivo
 
 const auth = new google.auth.JWT({
